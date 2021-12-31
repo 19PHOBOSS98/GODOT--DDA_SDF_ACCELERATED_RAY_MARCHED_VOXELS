@@ -1,10 +1,14 @@
 # GODOT--LIGHT_SPEED_RAY_CASTING_VOXELS-DDA_SDF_VOXEL_RENDERING
 
 Godot Version: 3.4.stable
+
 My System: MacBook Pro Intel Iris 1536 MB (Without NVIDIA)
+
 It's slow when using Texture3D voxel maps. It's either cause I'm using a Mac or I'm using an old Mac (the kind that DOESN'T have an NVIDIA GPU). Try it out, it should run faster with better hardware.
 
 The voxels might be a bit dirty and they might be surrounded by bubbles.
+
+
 
 
 Thanks to:
