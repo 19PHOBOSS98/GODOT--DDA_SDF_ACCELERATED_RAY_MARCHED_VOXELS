@@ -11,6 +11,8 @@
 
 <img width="1019" alt="Screen Shot 2021-12-31 at 6 46 30 PM" src="https://user-images.githubusercontent.com/37253663/147819256-8b3679db-e89d-4470-a752-e593a8671c9e.png">
 
+watch the [video](https://youtu.be/9p9JJ-nDqUg)
+
 Godot Version: 3.4.stable
 
 My System: MacBook Pro Intel Iris 1536 MB (Without NVIDIA :( )
