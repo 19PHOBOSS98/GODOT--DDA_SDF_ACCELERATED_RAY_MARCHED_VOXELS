@@ -1,4 +1,4 @@
-# GODOT--DDA_SDF_ACCELERATED_RAY_MARCHING_VOXELS
+# GODOT--DDA_SDF_ACCELERATED_RAY_MARCHED_VOXELS
 <img width="1008" alt="Screen Shot 2021-12-31 at 6 57 18 PM" src="https://user-images.githubusercontent.com/37253663/147819756-83d5e552-b8b1-435a-b9a9-606a5c752a05.png">
 <img width="1022" alt="Screen Shot 2021-12-31 at 6 52 59 PM" src="https://user-images.githubusercontent.com/37253663/147819799-a5a4d5ba-de67-403f-8d37-c30e1e309f11.png">
 <img width="1016" alt="Screen Shot 2021-12-31 at 6 53 40 PM" src="https://user-images.githubusercontent.com/37253663/147819805-c942324a-2fe7-4b31-92c7-406796a2d577.png">
