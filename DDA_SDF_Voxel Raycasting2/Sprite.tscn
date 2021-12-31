@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=2]
+
+[ext_resource path="res://PosMemory.gdshader" type="Shader" id=1]
+[ext_resource path="res://white2.exr" type="Texture" id=2]
+
+[sub_resource type="ShaderMaterial" id=32]
+shader = ExtResource( 1 )
+shader_param/active = false
+shader_param/sky_energy = 0.209
+shader_param/camera_basis = Basis( 1, 0, 0, 0, 1, 0, 0, 0, 1 )
+shader_param/camera_global_position = null
+shader_param/mat = 1
+shader_param/BOUNCE = 2
+shader_param/viewport_size = Vector2( 1024, 600 )
+shader_param/Center = Vector3( 0, 0, -150 )
+shader_param/Radius = 10.0
+shader_param/Dimensions = Vector3( 1, 1, 1 )
+shader_param/image = ExtResource( 2 )
+
+[node name="Sprite" type="Sprite"]
+material = SubResource( 32 )
+position = Vector2( 512, 300 )
+texture = ExtResource( 2 )

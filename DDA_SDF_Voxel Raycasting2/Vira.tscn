@@ -1,0 +1,430 @@
+[gd_scene load_steps=9 format=2]
+
+[ext_resource path="res://Jim.gd" type="Script" id=1]
+
+[sub_resource type="GDScript" id=12]
+script/source = "
+extends KinematicBody
+
+####### BASIC MOVEMENT #######
+export var SPEED=50
+export var ASTRALSPEED=100
+export var inertia = 0
+const Acceleration=4
+var cam = 0
+var mouse_sensitivity = -0.25
+var velocity=Vector3()
+var direction = Vector3()
+onready var cursor_y = $Head.transform.basis.y
+
+
+
+####### TELEPORTATION & ASTRAL_PROJECTION #######
+var astral_project = false
+
+####### GRAVITATIONAL ORIENTATION #######
+var mass = 20
+onready var g = global_transform.basis.y*-1#Vector3(0,-1,0)
+onready var rays = $RayCast
+onready var feet = $Head/RayCast2
+onready var on_ground = $On_ground
+var prev_g = Vector3(0,-1,0)
+var lock_grab = true
+var reorienting = false
+var time = 1
+var free = false
+var reset = false
+var snap = false
+
+onready var center = $CENTER	#Area node for detecting custom shaped gravity field \"collision shape\"
+onready var check_axis = $CENTER/CollisionShape.get_children()
+
+
+var proximal_portals = 0 setget set_proximal_portals, get_proximal_portals
+
+func set_proximal_portals(val):
+	if(val<0):
+		val = 0
+	proximal_portals = val
+
+func get_proximal_portals():
+	return proximal_portals
+
+#func is_near_more_portals():
+#	return self.proximal_portals > 1
+
+
+func _ready():
+	add_to_group(\"Players\")
+	for cast in check_axis:
+		cast.enabled = false
+	#print(check_axis[0].name)
+
+
+
+func _physics_process(delta):
+#	prints(get_collision_mask_bit(0),get_collision_mask_bit(10),proximal_portals)
+	#prints(self.global_transform.origin)
+	var gravity_down = g/g.length()
+
+
+
+####### BASIC MOVEMENT #######
+	if on_ground.is_colliding():
+		snap = true
+	direction = Vector3(0,0,0)
+	var aim = $Head/PCamera.get_global_transform().basis
+	if Input.is_action_pressed(\"ui_up\"):
+		direction -= aim.z
+	if Input.is_action_pressed(\"ui_down\"):
+		direction += aim.z
+	if Input.is_action_pressed(\"ui_left\"):
+		direction -= aim.x
+	if Input.is_action_pressed(\"ui_right\"):
+		direction += aim.x
+	if Input.is_action_pressed(\"ascend\"):
+		if (!astral_project && gravity_down != Vector3(0,0,0)):########## 
+			direction -= gravity_down
+		else:
+			direction.y += 1
+		snap = false
+	if Input.is_action_pressed(\"descend\"):
+		if (!astral_project && gravity_down != Vector3(0,0,0)):##########
+			direction += gravity_down##########
+		else:
+			direction.y -=1
+
+
+
+####### TELEPORTATION & ASTRAL_PROJECTION #######
+	if Input.is_action_just_pressed(\"t\"):		#Astral Project, teleport with 'V'
+		astral_project=true
+		lock_grab = false
+	if Input.is_action_just_pressed(\"f\"):		#cancels Astral Projection mode
+		astral_project=false
+		lock_grab = true
+	if Input.is_action_just_pressed(\"v\"):	#teleport to pointer
+		self.transform.origin=$Head/PCamera/P.global_transform.origin
+		astral_project=false
+
+
+
+####### GRAVITATIONAL ORIENTATION #######
+	if Input.is_action_just_pressed(\"r\"): #Reorients player to world axis
+		reorienting = true
+	if Input.is_action_pressed(\"z\"): #Reorients player to the left
+		pass
+	if Input.is_action_pressed(\"c\"): #Reorients player to the right
+		pass
+
+
+	\"\"\"
+####### PORTAL INTERACTION #######
+### waiting for Godot 4 for optimization ###
+	if Input.is_action_just_pressed(\"B\"):		#freezes portal cameras inplace
+		if($Head/PCamera.debug == true):
+			$Head/PCamera.debug = false
+			#print(\"Debug false\")
+		elif($Head/PCamera.debug == false):
+			$Head/PCamera.debug = true
+			#print(\"Debug true\")
+	\"\"\"
+
+
+	direction.normalized()
+	var target
+	if !astral_project:
+		target = direction*SPEED
+	else:
+		target = direction*ASTRALSPEED
+	velocity = velocity.linear_interpolate(target,Acceleration*delta)
+
+
+
+	if(prev_g != g):	#lets grab function only run when gravitational reorientation is needed
+		lock_grab = false #basically stops 'grabed' function from running every physics process call
+
+	if !astral_project:
+		if(reorienting):
+			grabed(Vector3(0,-1,0))
+		else:
+			if(!lock_grab):
+				grabed(gravity_down)
+		if !reset:
+			reset = true
+			$Head.transform.basis=$Head.global_transform.basis
+			cursor_y = $Head.transform.basis.y
+		var snap_vector = gravity_down if snap else Vector3()
+		#prints(snap,snap_vector)
+		if(proximal_portals>0):
+			snap_vector = Vector3(0,0,0)
+			gravity_down = Vector3(0,0,0)
+		velocity = self.move_and_slide_with_snap(velocity,snap_vector,-gravity_down,false,4,0.785398,false)#snap_vector
+		$Head/PCamera/P.transform.origin = Vector3(0,0,-10)
+		$Head.transform.origin=Vector3(0,0,0)
+	else:
+		if reset:
+			reset=false
+		if(!lock_grab):
+			re_head()
+		cursor_y = $Head.transform.basis.y
+		velocity = $Head.move_and_slide_with_snap(velocity,Vector3(0,0,0),Vector3(0,0,0),false,4,0.785398,false)#snap_vector #move_and_slide(velocity,Vector3(0,0,0),false,4,0.785398,false)
+#
+	for indx in get_slide_count():
+		var collision = get_slide_collision(indx)
+		if(collision.collider.is_in_group(\"bodies\")):
+			collision.collider.apply_central_impulse(-collision.normal*inertia)
+
+
+####### PORTAL INTERACTION #######
+#	if(abs(velocity.z)!=0):					#this triggers your player's camera
+#		$Head/PCamera.start_update()			#needs Head/PCamera gd script (temporarily disabled)
+
+
+
+func re_head():
+	var new_xform = $Head.global_transform
+	new_xform.basis.y = Vector3(0,1,0)
+	new_xform.basis.x = new_xform.basis.y.cross(new_xform.basis.z)########## aligning the x
+	new_xform.basis = new_xform.basis.orthonormalized()
+	$Head.global_transform = $Head.global_transform.interpolate_with(new_xform,0.05)
+	re($Head,new_xform)
+
+
+
+func grabed(gravity_down):
+	var new_xform = global_transform
+	new_xform.basis.y = -gravity_down
+	new_xform.basis.x = -gravity_down.cross(new_xform.basis.z)
+	new_xform.basis = new_xform.basis.orthonormalized()
+	re(self,new_xform)
+
+
+
+func re(body,to):
+	body.global_transform = body.global_transform.interpolate_with(to,0.05)
+	if(reorienting):
+		reorienting = false
+		g = Vector3(0,-1,0)
+
+
+
+func _input(event):
+	if (event is InputEventMouseMotion):
+		#$Head/PCamera.start_update() # UPDATES PORTAL CAMERAS, #needs Head/PCamera gd script (temporarily disabled)
+		$Head.rotate(cursor_y,deg2rad(event.relative.x * mouse_sensitivity))
+		var change = event.relative.y * mouse_sensitivity
+		if ((change + cam <90) && (change + cam >-90)):
+			get_tree().call_group(\"SCREENS\",\"update_view\",$Head/PCamera.global_transform)
+			$Head/PCamera.rotate_x(deg2rad(change))
+			cam += change
+
+\"\"\"
+### Used for Iregularly shaped custom gravity Fields refer to YT Video ###
+### Scheduled for deprecation, use better system than Raycasting ###
+func is_inside(atmosphere,x): #checks if player is inside a custom gravity field
+	if(x > 5): #if all check axis raycasts return the same reading(atmosphere) then player really is inside
+		return true
+	if(!check_axis[x].get_collider()): #if one of them returns null the player is outside atmosphere
+		return false
+	if(check_axis[x].get_collider() == atmosphere): #this recursively moves on to the next raycast if the first detected the atmosphere
+		return(is_inside(atmosphere,x+1))
+	else:	#if a ray does collide with something(another atmosphere) then it temporarily shuts of the collider's collision layer to check what's behind it
+		var entity = check_axis[x].get_collider()
+		entity.set_collision_layer_bit(19,false)
+		check_axis[x].force_raycast_update()
+		
+		if(!check_axis[x].get_collider()): #if nothing is behind it then this sets the things layer back to the way it was and returning false
+			#prints(entity.name,\"was disabled,\",check_axis[x].get_collider(),\"is behind it\")
+			entity.set_collision_layer_bit(19,true)
+			return false
+		else:#if there's something else behind it, this recursively checks if it's the trigger atmosphere or something else
+			if(is_inside(atmosphere,x)):	# if it hits the atmosphere we're looking for this sets every layer bit back and return true
+				#prints(entity.name,\"is disabled,\",check_axis[x].get_collider().name,\"is behind it\")
+				entity.set_collision_layer_bit(19,true)
+				return true
+
+
+###these two interact with concave colision shapes used as gravity fields using the player's area trigger: 'CENTER'
+#since 
+var contact_point = null
+var current_planetary_atmosphere = null
+func _on_CENTER_body_entered(body):
+	if(body.is_in_group(\"Gravity Field\")):
+		current_planetary_atmosphere = body
+		contact_point = self.global_transform.origin
+		#prints(\"contact point is\",contact_point)
+		for cast in check_axis:
+			cast.enabled = true
+			cast.force_raycast_update()
+
+
+
+func _on_CENTER_body_exited(body):
+	if(body.is_in_group(\"Gravity Field\")):
+		if(is_inside(body,0)):
+			#prints(self.name,\"is inside:\",body.name)
+			body.entering_atmosphere(self,contact_point)
+		else:
+			#prints(self.name,\"is outside:\",body.name)
+			body.exiting_atmosphere(self)
+			current_planetary_atmosphere = null
+		for cast in check_axis:
+			cast.enabled = false
+\"\"\"
+	
+	
+	
+	
+	
+"
+
+[sub_resource type="CapsuleMesh" id=13]
+mid_height = 2.0
+
+[sub_resource type="SpatialMaterial" id=14]
+albedo_color = Color( 0, 0, 0, 1 )
+emission_enabled = true
+emission = Color( 1, 0.721569, 0, 1 )
+emission_energy = 1.0
+emission_operator = 0
+emission_on_uv2 = false
+
+[sub_resource type="CapsuleShape" id=15]
+height = 2.0
+
+[sub_resource type="SphereShape" id=16]
+
+[sub_resource type="SphereMesh" id=17]
+radius = 0.25
+height = 0.5
+
+[sub_resource type="CapsuleShape" id=18]
+height = 2.0
+
+[node name="Vira" type="KinematicBody"]
+collision_layer = 15
+collision_mask = 15
+script = SubResource( 12 )
+__meta__ = {
+"_editor_description_": "Astral-Project: T
+Stop Astral-Project: F
+Teleport: V (toggle \"Teleport_Target\" node visible first; can be used while astral projecting)
+
+Auto_Gravitational_Orientation_Ready 
+{
+when in a gravity field just pass the gravity vector (which way is down) to \"Vira.g\"
+and set parts of the planet to have their collision layer set as the ff:
+bit 2 # make surface normal usable (used to reorient Vira)
+bit 3 # make surface normal not usable (notify CompositePlanet Node to auto set planet part)
+bit 4 # surface is selectable for body reorientation (walk on wall regardless of overall planetary gravity)
+
+for walkable surface:
+2 true
+3 false
+4 true
+
+for slopes:
+2 false
+3 true
+4 false
+
+for non-climbable but walkable surface:
+2 true
+3 false
+4 false
+}
+Reorient To World Axis: R
+"
+}
+
+[node name="MeshInstance" type="MeshInstance" parent="."]
+transform = Transform( 1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, -1.47527, 1.66533e-15 )
+mesh = SubResource( 13 )
+material/0 = SubResource( 14 )
+
+[node name="CollisionShape" type="CollisionShape" parent="."]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.48988, -4.21885e-15 )
+shape = SubResource( 15 )
+
+[node name="Head" type="KinematicBody" parent="."]
+collision_layer = 262144
+collision_mask = 262144
+
+[node name="RayCast2" type="RayCast" parent="Head"]
+transform = Transform( 1, 0, 0, 0, 0.996194, -0.0871557, 0, 0.0871557, 0.996194, 0, 1.5, -0.9 )
+enabled = true
+cast_to = Vector3( 0, -6, 0 )
+collision_mask = 16
+
+[node name="CollisionShape" type="CollisionShape" parent="Head"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10 )
+shape = SubResource( 16 )
+
+[node name="PCamera" type="Camera" parent="Head"]
+cull_mask = 3
+current = true
+far = 1e+06
+script = ExtResource( 1 )
+
+[node name="P" type="Position3D" parent="Head/PCamera"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10 )
+
+[node name="Teleport_Target" type="MeshInstance" parent="Head/PCamera/P"]
+visible = false
+mesh = SubResource( 17 )
+material/0 = null
+
+[node name="RayCast" type="RayCast" parent="."]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.5, 0 )
+visible = false
+enabled = true
+cast_to = Vector3( 0, -20, 0 )
+collision_mask = 524295
+
+[node name="CENTER" type="Area" parent="."]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.5, 0 )
+collision_layer = 524288
+collision_mask = 524288
+
+[node name="CollisionShape" type="CollisionShape" parent="CENTER"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, 1, 0, -1, -1.62921e-07, 0, 0, 0 )
+shape = SubResource( 18 )
+
+[node name="a" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( 0, 0, 100000 )
+collision_mask = 524288
+
+[node name="b" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( 0, 0, -100000 )
+collision_mask = 524288
+
+[node name="c" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( 100000, 0, 0 )
+collision_mask = 524288
+
+[node name="d" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( -10000, 0, 0 )
+collision_mask = 524288
+
+[node name="e" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( 0, 10000, 0 )
+collision_mask = 524288
+
+[node name="f" type="RayCast" parent="CENTER/CollisionShape"]
+transform = Transform( 1, 0, 0, 0, -1.62921e-07, -1, 0, 1, -1.62921e-07, 0, -1.64877e-09, 0.01012 )
+cast_to = Vector3( 0, -10000, 0 )
+collision_mask = 524288
+
+[node name="On_ground" type="RayCast" parent="."]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -3, 0 )
+enabled = true
+cast_to = Vector3( 0, -2, 0 )
+
+[connection signal="body_entered" from="CENTER" to="." method="_on_CENTER_body_entered"]
+[connection signal="body_exited" from="CENTER" to="." method="_on_CENTER_body_exited"]
