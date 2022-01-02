@@ -47,3 +47,8 @@ Mikael Hvidtfeldt Christensen (Depth Buffer): http://blog.hvidtfeldts.net/index.
 
  henriquelalves (Godot Recorder): https://godotengine.org/asset-library/asset/220
 and everyone from r/Godot and r/openGL
+
+EDIT:
+Sorry, almost forgot to thank these guys as reference:
+Xor: https://www.shadertoy.com/view/fstSRH
+fizzer: https://www.shadertoy.com/view/MllcD7
