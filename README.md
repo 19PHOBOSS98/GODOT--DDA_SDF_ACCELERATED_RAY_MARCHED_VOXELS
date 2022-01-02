@@ -50,5 +50,7 @@ and everyone from r/Godot and r/openGL
 
 EDIT:
 Sorry, almost forgot to thank these guys as reference:
+
 Xor: https://www.shadertoy.com/view/fstSRH
+
 fizzer: https://www.shadertoy.com/view/MllcD7
